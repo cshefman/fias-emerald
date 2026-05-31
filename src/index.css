@@ -1,0 +1,235 @@
+/* self-hosted fonts (offline) */
+@import "@fontsource/cinzel/500.css";
+@import "@fontsource/cinzel/600.css";
+@import "@fontsource/cinzel/700.css";
+@import "@fontsource/cinzel-decorative/700.css";
+@import "@fontsource/spectral/300.css";
+@import "@fontsource/spectral/400.css";
+@import "@fontsource/spectral/500.css";
+@import "@fontsource/spectral/600.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Palette + custom look. Emerald "Balanced" theme — jewel-emerald primary on a
+   near-black green, with the gem's gold serpent setting kept as the accent.
+   The --sap* token names are retained from the Sapphire template (now emerald
+   values) to avoid churn across the component CSS. The gem is raster art, not an SVG.
+--------------------------------------------------------------------------- */
+:root {
+  --bg0: #06100b;
+  --bg1: #0c1f16;
+  --bg2: #123026;
+  --sap: #1f9d57; /* primary emerald */
+  --sap-bright: #57db93;
+  --sap-deep: #0c5a33;
+  --sap-glow: #34c878;
+  --ice: #cdf3df; /* mint accent */
+  --gold: #e9bd4c;
+  --gold-bright: #f7da86;
+  --gold-deep: #a9781d;
+  --ink: #e9fcf1;
+  --mut: #8fc4a8;
+  --mut2: #6c9e83;
+  --lock: #2a4438;
+  --lock-ink: #5e9a78;
+  --line: rgba(120, 210, 160, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+body {
+  font-family: "Spectral", Georgia, serif;
+  background:
+    radial-gradient(1200px 800px at 50% -10%, #123026 0%, rgba(18, 48, 38, 0) 60%),
+    radial-gradient(900px 700px at 80% 110%, #0c2417 0%, rgba(12, 36, 23, 0) 55%),
+    linear-gradient(160deg, #06100b 0%, #0a1a12 55%, #06100b 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* drifting storm clouds */
+.sky {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.cloud {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
+}
+.c1 {
+  width: 60vw;
+  height: 36vw;
+  left: -10vw;
+  top: 8%;
+  background: #16402b;
+  animation: drift1 26s ease-in-out infinite;
+}
+.c2 {
+  width: 50vw;
+  height: 34vw;
+  right: -8vw;
+  top: 30%;
+  background: #123524;
+  animation: drift2 32s ease-in-out infinite;
+}
+.c3 {
+  width: 46vw;
+  height: 30vw;
+  left: 25vw;
+  bottom: -6%;
+  background: #102b1d;
+  animation: drift1 38s ease-in-out infinite reverse;
+}
+@keyframes drift1 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(5vw, -3vh, 0);
+  }
+}
+@keyframes drift2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-6vw, 4vh, 0);
+  }
+}
+
+/* gem + activation choreography */
+.sapphire {
+  position: relative;
+  width: 156px;
+  height: 156px;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 24px rgba(52, 200, 120, 0.55));
+  animation: breathe 5.5s ease-in-out infinite;
+}
+.gemArt {
+  width: 156px;
+  height: auto;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+@keyframes charge {
+  0% {
+    filter: drop-shadow(0 0 24px rgba(52, 200, 120, 0.55));
+  }
+  28% {
+    filter: drop-shadow(0 0 60px rgba(190, 255, 220, 1)) brightness(1.65);
+  }
+  100% {
+    filter: drop-shadow(0 0 24px rgba(52, 200, 120, 0.55));
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  15% {
+    transform: translate(-4px, 2px);
+  }
+  30% {
+    transform: translate(4px, -3px);
+  }
+  45% {
+    transform: translate(-3px, -2px);
+  }
+  60% {
+    transform: translate(3px, 2px);
+  }
+  80% {
+    transform: translate(-2px, 1px);
+  }
+}
+.sapphire.fire {
+  animation:
+    shake 0.45s ease,
+    charge 0.65s ease;
+}
+
+@keyframes flick {
+  0% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 0.25;
+  }
+  38% {
+    opacity: 1;
+  }
+  65% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.bolt {
+  animation: flick 0.52s linear forwards;
+}
+@keyframes ringexp {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+.ring {
+  animation: ringexp 0.62s ease-out forwards;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
