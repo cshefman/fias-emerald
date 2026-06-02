@@ -4,7 +4,6 @@ import { POWERS, POWER_ORDER, SHORT_NAME } from "../powers";
 import { POWER_ICONS } from "../icons";
 import type { PowerKey, TierLevel } from "../types";
 
-const SVGNS = "http://www.w3.org/2000/svg";
 const SW = 412;
 const SH = 360;
 const CX = 206;
@@ -124,44 +123,37 @@ function petalStream(over: HTMLElement, nx: number, ny: number, gx: number, gy: 
   }
 }
 
-/** A single petal drifting quietly near the gem (idle ambience, in-stage SVG layer). */
-function ambientPetal(fx: SVGSVGElement) {
+/** A single petal drifting quietly near the gem (idle ambience, in-stage HTML layer). */
+function ambientPetal(layer: HTMLElement) {
+  const cx = layer.clientWidth / 2;
+  const cy = layer.clientHeight / 2;
   const ang = Math.random() * Math.PI * 2;
-  const r0 = 38 + Math.random() * 22;
-  const sx = CX + Math.cos(ang) * r0;
-  const sy = CY + Math.sin(ang) * r0;
-  const ex = sx + Math.cos(ang) * 36;
-  const ey = sy - 28 - Math.random() * 34; // drift up and out
-  const g = document.createElementNS(SVGNS, "g");
-  const path = document.createElementNS(SVGNS, "path");
-  path.setAttribute("d", "M0,-6 C3.6,-3 3.6,3 0,6 C-3.6,3 -3.6,-3 0,-6 Z");
-  path.setAttribute("fill", PETAL_COLORS[(Math.random() * PETAL_COLORS.length) | 0]);
-  g.appendChild(path);
-  const tr = document.createElementNS(SVGNS, "animateTransform");
-  tr.setAttribute("attributeName", "transform");
-  tr.setAttribute("type", "translate");
-  tr.setAttribute("from", `${sx} ${sy}`);
-  tr.setAttribute("to", `${ex} ${ey}`);
-  tr.setAttribute("dur", "2.6s");
-  tr.setAttribute("fill", "freeze");
-  g.appendChild(tr);
-  const ro = document.createElementNS(SVGNS, "animateTransform");
-  ro.setAttribute("attributeName", "transform");
-  ro.setAttribute("type", "rotate");
-  ro.setAttribute("from", "0");
-  ro.setAttribute("to", String((Math.random() * 2 - 1) * 200));
-  ro.setAttribute("dur", "2.6s");
-  ro.setAttribute("additive", "sum");
-  ro.setAttribute("fill", "freeze");
-  g.appendChild(ro);
-  const op = document.createElementNS(SVGNS, "animate");
-  op.setAttribute("attributeName", "opacity");
-  op.setAttribute("values", "0;.85;0");
-  op.setAttribute("dur", "2.6s");
-  op.setAttribute("fill", "freeze");
-  g.appendChild(op);
-  fx.appendChild(g);
-  window.setTimeout(() => g.remove(), 2700);
+  const r0 = 34 + Math.random() * 30;
+  const sx = cx + Math.cos(ang) * r0;
+  const sy = cy + Math.sin(ang) * r0;
+  const size = 7 + Math.random() * 6;
+  const el = makePetal(sx, sy, size);
+  layer.appendChild(el);
+  const dx = Math.cos(ang) * 28;
+  const dy = -34 - Math.random() * 30; // drift up and out
+  const r1 = (Math.random() * 2 - 1) * 160;
+  const anim = el.animate(
+    [
+      { transform: "translate(-50%,-50%) rotate(0deg) scale(.5)", opacity: 0, offset: 0 },
+      {
+        transform: `translate(calc(-50% + ${dx * 0.5}px), calc(-50% + ${dy * 0.5}px)) rotate(${r1 / 2}deg) scale(1)`,
+        opacity: 0.8,
+        offset: 0.4,
+      },
+      {
+        transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${r1}deg) scale(.9)`,
+        opacity: 0,
+        offset: 1,
+      },
+    ],
+    { duration: 2600, easing: "ease-out", fill: "forwards" },
+  );
+  anim.onfinish = () => el.remove();
 }
 
 export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
@@ -170,7 +162,7 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
 ) {
   const sapphireRef = useRef<HTMLDivElement>(null);
   const wiresRef = useRef<SVGSVGElement>(null);
-  const fxRef = useRef<SVGSVGElement>(null);
+  const ambientRef = useRef<HTMLDivElement>(null);
   const fxOverRef = useRef<HTMLDivElement>(null); // viewport overlay, paints above the drawer
   const pressTimer = useRef<number | null>(null);
 
@@ -250,13 +242,14 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
 
   useImperativeHandle(ref, () => ({ pulse, dramatize }));
 
-  // idle ambient petals drifting near the gem (in-stage layer, behind everything)
+  // idle ambient petals drifting near the gem
   useEffect(() => {
     const id = window.setInterval(() => {
-      const fx = fxRef.current;
-      if (!fx) return;
-      ambientPetal(fx);
-    }, 2400);
+      if (document.hidden) return; // timeline is paused while backgrounded — don't pile up petals
+      const layer = ambientRef.current;
+      if (!layer) return;
+      ambientPetal(layer);
+    }, 2200);
     return () => window.clearInterval(id);
   }, []);
 
@@ -291,7 +284,7 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
           );
         })}
       </svg>
-      <svg className="fx" ref={fxRef} viewBox={`0 0 ${SW} ${SH}`} preserveAspectRatio="none" />
+      <div className="fx ambient" ref={ambientRef} />
       <div
         className="fx-over"
         ref={fxOverRef}
