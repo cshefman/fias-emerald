@@ -10,10 +10,13 @@ const SH = 360;
 const CX = 206;
 const CY = 180;
 
+/** Flower-petal palette for the activation FX (Violet Aeonia violets + emerald leaves + gold). */
+const PETAL_COLORS = ["#b98cff", "#a779ff", "#d98fe0", "#f7da86", "#57db93", "#7fe0b0"];
+
 export interface GemHandle {
   /** gem charge + shake (on open / tap). */
   pulse: () => void;
-  /** full activation: bolt down the wire, shockwave ring, shake, flash, wire light. */
+  /** full activation: petal burst + bloom ring + petal stream, played over the drawer. */
   dramatize: (key: PowerKey) => void;
 }
 
@@ -24,24 +27,141 @@ interface Props {
   flashRef: React.RefObject<HTMLDivElement>;
 }
 
-function P(cx: number, cy: number, ang: number, r: number): [number, number] {
-  const a = (ang * Math.PI) / 180;
-  return [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+// ---------------------------------------------------------------------------
+// Petal FX helpers (pixel-space, rendered on the viewport overlay so they paint
+// above the drawer). Each animation cleans up its own DOM node on finish.
+// ---------------------------------------------------------------------------
+function makePetal(x: number, y: number, size: number): HTMLDivElement {
+  const el = document.createElement("div");
+  el.className = "petal";
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  const c = PETAL_COLORS[(Math.random() * PETAL_COLORS.length) | 0];
+  el.style.background = `radial-gradient(circle at 32% 28%, rgba(255,255,255,.85), ${c} 70%)`;
+  return el;
 }
-function boltPts(x1: number, y1: number, x2: number, y2: number, seg: number, jit: number) {
-  const pts: [number, number][] = [[x1, y1]];
-  const nx = -(y2 - y1);
-  const ny = x2 - x1;
-  const len = Math.hypot(nx, ny) || 1;
-  for (let i = 1; i < seg; i++) {
-    const t = i / seg;
-    const mx = x1 + (x2 - x1) * t;
-    const my = y1 + (y2 - y1) * t;
-    const off = (Math.random() * 2 - 1) * jit;
-    pts.push([mx + (nx / len) * off, my + (ny / len) * off]);
+
+/** A spray of petals bursting outward from the gem, drifting down as they fade. */
+function petalBurst(over: HTMLElement, gx: number, gy: number) {
+  const N = 14;
+  for (let i = 0; i < N; i++) {
+    const ang = (i / N) * Math.PI * 2 + Math.random() * 0.6;
+    const dist = 70 + Math.random() * 95;
+    const dx = Math.cos(ang) * dist;
+    const dy = Math.sin(ang) * dist;
+    const size = 9 + Math.random() * 9;
+    const el = makePetal(gx, gy, size);
+    over.appendChild(el);
+    const r0 = Math.random() * 360;
+    const r1 = r0 + (Math.random() * 2 - 1) * 220;
+    const anim = el.animate(
+      [
+        { transform: `translate(-50%,-50%) rotate(${r0}deg) scale(.3)`, opacity: 0, offset: 0 },
+        {
+          transform: `translate(calc(-50% + ${dx * 0.5}px), calc(-50% + ${dy * 0.5}px)) rotate(${(r0 + r1) / 2}deg) scale(1)`,
+          opacity: 1,
+          offset: 0.28,
+        },
+        {
+          transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy + 34}px)) rotate(${r1}deg) scale(.92)`,
+          opacity: 0,
+          offset: 1,
+        },
+      ],
+      { duration: 720 + Math.random() * 380, easing: "cubic-bezier(.18,.7,.3,1)", fill: "forwards" },
+    );
+    anim.onfinish = () => el.remove();
   }
-  pts.push([x2, y2]);
-  return pts;
+}
+
+/** A soft expanding bloom ripple centred on the gem. */
+function bloomRing(over: HTMLElement, gx: number, gy: number) {
+  const ring = document.createElement("div");
+  ring.className = "bloom-ring";
+  ring.style.left = `${gx}px`;
+  ring.style.top = `${gy}px`;
+  over.appendChild(ring);
+  const anim = ring.animate(
+    [
+      { transform: "translate(-50%,-50%) scale(.2)", opacity: 0.8 },
+      { transform: "translate(-50%,-50%) scale(3.4)", opacity: 0 },
+    ],
+    { duration: 680, easing: "ease-out", fill: "forwards" },
+  );
+  anim.onfinish = () => ring.remove();
+}
+
+/** A trail of petals flowing from the firing node into the gem. */
+function petalStream(over: HTMLElement, nx: number, ny: number, gx: number, gy: number) {
+  const N = 7;
+  for (let i = 0; i < N; i++) {
+    const size = 8 + Math.random() * 7;
+    const el = makePetal(nx, ny, size);
+    over.appendChild(el);
+    const jx = (Math.random() * 2 - 1) * 40;
+    const jy = (Math.random() * 2 - 1) * 40;
+    const r1 = Math.random() * 540;
+    const anim = el.animate(
+      [
+        { transform: "translate(-50%,-50%) translate(0px,0px) rotate(0deg) scale(.6)", opacity: 0, offset: 0 },
+        { opacity: 1, offset: 0.2 },
+        {
+          transform: `translate(-50%,-50%) translate(${(gx - nx) / 2 + jx}px, ${(gy - ny) / 2 + jy}px) rotate(${r1 / 2}deg) scale(1)`,
+          opacity: 1,
+          offset: 0.55,
+        },
+        {
+          transform: `translate(-50%,-50%) translate(${gx - nx}px, ${gy - ny}px) rotate(${r1}deg) scale(.4)`,
+          opacity: 0,
+          offset: 1,
+        },
+      ],
+      { duration: 520, delay: i * 45, easing: "ease-in", fill: "forwards" },
+    );
+    anim.onfinish = () => el.remove();
+  }
+}
+
+/** A single petal drifting quietly near the gem (idle ambience, in-stage SVG layer). */
+function ambientPetal(fx: SVGSVGElement) {
+  const ang = Math.random() * Math.PI * 2;
+  const r0 = 38 + Math.random() * 22;
+  const sx = CX + Math.cos(ang) * r0;
+  const sy = CY + Math.sin(ang) * r0;
+  const ex = sx + Math.cos(ang) * 36;
+  const ey = sy - 28 - Math.random() * 34; // drift up and out
+  const g = document.createElementNS(SVGNS, "g");
+  const path = document.createElementNS(SVGNS, "path");
+  path.setAttribute("d", "M0,-6 C3.6,-3 3.6,3 0,6 C-3.6,3 -3.6,-3 0,-6 Z");
+  path.setAttribute("fill", PETAL_COLORS[(Math.random() * PETAL_COLORS.length) | 0]);
+  g.appendChild(path);
+  const tr = document.createElementNS(SVGNS, "animateTransform");
+  tr.setAttribute("attributeName", "transform");
+  tr.setAttribute("type", "translate");
+  tr.setAttribute("from", `${sx} ${sy}`);
+  tr.setAttribute("to", `${ex} ${ey}`);
+  tr.setAttribute("dur", "2.6s");
+  tr.setAttribute("fill", "freeze");
+  g.appendChild(tr);
+  const ro = document.createElementNS(SVGNS, "animateTransform");
+  ro.setAttribute("attributeName", "transform");
+  ro.setAttribute("type", "rotate");
+  ro.setAttribute("from", "0");
+  ro.setAttribute("to", String((Math.random() * 2 - 1) * 200));
+  ro.setAttribute("dur", "2.6s");
+  ro.setAttribute("additive", "sum");
+  ro.setAttribute("fill", "freeze");
+  g.appendChild(ro);
+  const op = document.createElementNS(SVGNS, "animate");
+  op.setAttribute("attributeName", "opacity");
+  op.setAttribute("values", "0;.85;0");
+  op.setAttribute("dur", "2.6s");
+  op.setAttribute("fill", "freeze");
+  g.appendChild(op);
+  fx.appendChild(g);
+  window.setTimeout(() => g.remove(), 2700);
 }
 
 export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
@@ -51,6 +171,7 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
   const sapphireRef = useRef<HTMLDivElement>(null);
   const wiresRef = useRef<SVGSVGElement>(null);
   const fxRef = useRef<SVGSVGElement>(null);
+  const fxOverRef = useRef<HTMLDivElement>(null); // viewport overlay, paints above the drawer
   const pressTimer = useRef<number | null>(null);
 
   // stable wire midpoint jitter per node
@@ -88,57 +209,40 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
     setTimeout(() => s.classList.remove("fire"), 680);
   }
 
-  function drawBolt(x1: number, y1: number, x2: number, y2: number) {
-    const fx = fxRef.current;
-    if (!fx) return;
-    const pts = boltPts(x1, y1, x2, y2, 7, 16);
-    const d = "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L ");
-    const mk = (stroke: string, w: string) => {
-      const p = document.createElementNS(SVGNS, "path");
-      p.setAttribute("d", d);
-      p.setAttribute("fill", "none");
-      p.setAttribute("stroke", stroke);
-      p.setAttribute("stroke-width", w);
-      p.setAttribute("stroke-linecap", "round");
-      p.setAttribute("class", "bolt");
-      return p;
-    };
-    const glow = mk("rgba(110,235,170,.55)", "7");
-    const core = mk("#eafff2", "2");
-    fx.appendChild(glow);
-    fx.appendChild(core);
-    setTimeout(() => {
-      glow.remove();
-      core.remove();
-    }, 540);
-  }
-
   function dramatize(key: PowerKey) {
     pulse();
     fireFlash();
-    const fx = fxRef.current;
-    if (fx) {
-      const ring = document.createElementNS(SVGNS, "circle");
-      ring.setAttribute("cx", String(CX));
-      ring.setAttribute("cy", String(CY));
-      ring.setAttribute("r", "16");
-      ring.setAttribute("fill", "none");
-      ring.setAttribute("stroke", "#bfffdb");
-      ring.setAttribute("stroke-width", "3");
-      ring.setAttribute("class", "ring");
-      ring.style.transformOrigin = `${CX}px ${CY}px`;
-      fx.appendChild(ring);
-      setTimeout(() => ring.remove(), 660);
+
+    // Activation burst rendered on the viewport overlay so it paints above the drawer.
+    // Coordinates are real screen pixels measured from the DOM (the overlay has no viewBox).
+    const over = fxOverRef.current;
+    const gem = sapphireRef.current;
+    if (over && gem) {
+      const ob = over.getBoundingClientRect(); // overlay origin (no-op unless an ancestor is a containing block)
+      const gr = gem.getBoundingClientRect();
+      const gx = gr.left + gr.width / 2 - ob.left;
+      const gy = gr.top + gr.height / 2 - ob.top;
+
+      bloomRing(over, gx, gy);
+      petalBurst(over, gx, gy);
+
+      const disc = document.querySelector<HTMLElement>(`[data-node="${key}"] .disc`);
+      if (disc) {
+        const nr = disc.getBoundingClientRect();
+        const nx = nr.left + nr.width / 2 - ob.left;
+        const ny = nr.top + nr.height / 2 - ob.top;
+        petalStream(over, nx, ny, gx, gy);
+      }
     }
-    const n = POWERS[key].node;
-    drawBolt((SW * n.x) / 100, (SH * n.y) / 100, CX, CY);
-    // briefly light the wire
+
+    // briefly light the wire from the firing node (quiet in-stage accent)
     const wire = wiresRef.current?.querySelector<SVGPathElement>(`path[data-key="${key}"]`);
     if (wire) {
       wire.setAttribute("stroke", "rgba(190,255,220,.95)");
       wire.setAttribute("stroke-width", "2.6");
       setTimeout(() => {
-        wire.setAttribute("stroke", "rgba(233,189,76,.32)");
+        const active = POWERS[key].kind === "active";
+        wire.setAttribute("stroke", active ? "rgba(233,189,76,.32)" : "rgba(87,219,147,.26)");
         wire.setAttribute("stroke-width", "1.2");
       }, 620);
     }
@@ -146,27 +250,13 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
 
   useImperativeHandle(ref, () => ({ pulse, dramatize }));
 
-  // idle ambient arcs near the gem
+  // idle ambient petals drifting near the gem (in-stage layer, behind everything)
   useEffect(() => {
     const id = window.setInterval(() => {
       const fx = fxRef.current;
       if (!fx) return;
-      const a = Math.random() * 360;
-      const b = a + 90 + Math.random() * 120;
-      const p1 = P(CX, CY, a, 52);
-      const p2 = P(CX, CY, b, 52);
-      const pts = boltPts(p1[0], p1[1], p2[0], p2[1], 5, 9);
-      const d = "M" + pts.map((p) => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L ");
-      const arc = document.createElementNS(SVGNS, "path");
-      arc.setAttribute("d", d);
-      arc.setAttribute("fill", "none");
-      arc.setAttribute("stroke", "rgba(150,235,180,.5)");
-      arc.setAttribute("stroke-width", "1.4");
-      arc.setAttribute("stroke-linecap", "round");
-      arc.setAttribute("class", "bolt");
-      fx.appendChild(arc);
-      setTimeout(() => arc.remove(), 540);
-    }, 4200);
+      ambientPetal(fx);
+    }, 2400);
     return () => window.clearInterval(id);
   }, []);
 
@@ -202,6 +292,11 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
         })}
       </svg>
       <svg className="fx" ref={fxRef} viewBox={`0 0 ${SW} ${SH}`} preserveAspectRatio="none" />
+      <div
+        className="fx-over"
+        ref={fxOverRef}
+        style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", pointerEvents: "none", zIndex: 60 }}
+      />
 
       <div className="sapphire" ref={sapphireRef} onClick={pulse} title="Fia's Emerald">
         <img className="gemArt" src={gemArt} alt="Fia's Emerald" width={156} />
@@ -219,6 +314,7 @@ export const GemHub = forwardRef<GemHandle, Props>(function GemHub(
           <div
             key={key}
             className={cls}
+            data-node={key}
             style={{
               left: `calc(${meta.node.x}% - 42px)`,
               top: `calc(${meta.node.y}% - 36px)`,

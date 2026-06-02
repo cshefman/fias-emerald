@@ -38,6 +38,7 @@ export default function App() {
         {view === "home" ? (
           <>
             <GemHub
+              ref={gemRef}
               unlocked={state.unlocked}
               onOpenPower={openPower}
               onManage={manage}

@@ -114,6 +114,30 @@
   z-index: 2;
 }
 
+/* activation petal FX — rendered on the viewport overlay so it paints over the drawer */
+.fx-over {
+  overflow: visible;
+}
+.petal {
+  position: absolute;
+  border-radius: 0 100% 0 100%;
+  pointer-events: none;
+  will-change: transform, opacity;
+  box-shadow: 0 0 7px rgba(167, 121, 255, 0.4);
+}
+.bloom-ring {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 2px solid rgba(127, 224, 176, 0.9);
+  box-shadow:
+    0 0 22px rgba(87, 219, 147, 0.5),
+    inset 0 0 18px rgba(247, 218, 134, 0.35);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
 /* orbit nodes */
 .node {
   position: absolute;
