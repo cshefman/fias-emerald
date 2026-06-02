@@ -5,39 +5,29 @@ import type { Rng } from "./dice";
 const max: Rng = () => 0.999; // every die rolls its maximum face
 
 describe("Violet Aeonia @ Superior (level 3)", () => {
-  it("self-heals 4d8 (separate), and Poison+Acid scale per designated creature", () => {
-    const out = rollPower("aeonia", 3, { designated: 2 }, max);
+  it("self-heals 4d8 (separate) and rolls Poison 3d6 + Acid 3d6 once (no per-creature scaling)", () => {
+    const out = rollPower("aeonia", 3, {}, max);
     const [heal, poison, acid] = out.effects;
     expect(heal.heal).toBe(true);
     expect(heal.faces).toHaveLength(4); // 4 hit dice
     expect(poison.type).toBe("poison");
     expect(acid.type).toBe("acid");
-    expect(poison.faces).toHaveLength(6); // 3d6 × 2 creatures
-    expect(acid.faces).toHaveLength(6);
+    expect(poison.faces).toHaveLength(3); // 3d6, single roll for the whole AoE
+    expect(acid.faces).toHaveLength(3);
     expect(out.healTotal).toBe(32); // 4×8, excluded from damage
-    expect(out.damageTotal).toBe(36 + 36); // (3d6 max ×2) Poison + (3d6 max ×2) Acid
+    expect(out.damageTotal).toBe(18 + 18); // 3d6 max Poison + 3d6 max Acid
   });
 
-  it("designated input defaults to 1 and self-heal is raw hit dice (no modifier)", () => {
-    const [designated] = inputsFor("aeonia", 1);
-    expect(designated.id).toBe("designated");
-    expect(designated.val).toBe(1);
-    const heal = rollPower("aeonia", 1, { designated: 1 }, max).effects[0];
+  it("has no inputs (designated-creature selector removed) and self-heal is raw hit dice", () => {
+    expect(inputsFor("aeonia", 1)).toEqual([]);
+    const heal = rollPower("aeonia", 1, {}, max).effects[0];
     expect(heal.faces).toHaveLength(2); // Base self-heal = 2 HD
     expect(heal.modifier).toBe(0);
     expect(heal.subtotal).toBe(16); // 2×8, no modifier
   });
 
-  it("designated = 0 yields no Poison/Acid damage but still heals", () => {
-    const out = rollPower("aeonia", 1, { designated: 0 }, max);
-    expect(out.effects[1].faces).toHaveLength(0); // poison
-    expect(out.effects[2].faces).toHaveLength(0); // acid
-    expect(out.damageTotal).toBe(0);
-    expect(out.healTotal).toBe(16);
-  });
-
   it("adds non-rolling condition + sludge reminders", () => {
-    const out = rollPower("aeonia", 4, { designated: 1 }, max);
+    const out = rollPower("aeonia", 4, {}, max);
     const reminders = out.effects.filter((e) => !e.rolling);
     expect(reminders).toHaveLength(2);
     expect(reminders.some((r) => /Dazed/.test(r.formula))).toBe(true); // Ultimate adds Dazed

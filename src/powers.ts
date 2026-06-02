@@ -104,11 +104,11 @@ export interface InputDef {
 export const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
 
 export function inputsFor(key: PowerKey, _level: TierLevel): InputDef[] {
-  if (key === "aeonia")
-    return [{ id: "designated", label: "Creatures designated", val: 1, min: 0, max: 12 }];
   if (key === "feyBlossom")
     return [{ id: "season", label: "Season", val: 0, min: 0, max: 3, options: SEASONS }];
-  return []; // thorn: no inputs; passives never roll
+  // aeonia: the Poison/Acid AoE is rolled once for all designated creatures (each saves for half),
+  // so the designated count never changes the roll — no input. thorn: none; passives never roll.
+  return [];
 }
 
 // ----------------------------------------------------------------------------
@@ -127,9 +127,9 @@ export function rollPower(key: PowerKey, level: TierLevel, inputs: Record<string
       heal: true,
       note: `raw ${aeoniaTiers.selfHealHD[t]}${config.character.hitDie} · no modifier`,
     });
-    const designated = inputs.designated ?? 0;
-    b.add({ label: "Poison", n: aeoniaTiers.poisonN[t], sides: 6, type: "poison", targets: designated, note: "DEX ½ · per designated creature" });
-    b.add({ label: "Acid", n: aeoniaTiers.acidN[t], sides: 6, type: "acid", targets: designated, note: "DEX ½ · per designated creature" });
+    // Rolled once for the whole AoE; every designated creature takes this (half on a DEX save).
+    b.add({ label: "Poison", n: aeoniaTiers.poisonN[t], sides: 6, type: "poison", note: "DEX save halves" });
+    b.add({ label: "Acid", n: aeoniaTiers.acidN[t], sides: 6, type: "acid", note: "DEX save halves" });
     b.reminder("On a failed CON save", `${aeoniaTiers.conditions[t]} for 1 minute`, "poison");
     b.reminder("Sludge", `${aeoniaTiers.blobs[t]} blobs (10×10ft)${t >= 1 ? ", difficult terrain" : ""}, lasts 1 minute`, "acid");
     return b.build();
